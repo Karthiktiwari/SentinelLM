@@ -42,6 +42,7 @@ class SentinelEngine:
         self.anomaly_queue = queue.Queue(maxsize=100) # For UI display
         self.log_queue = queue.Queue(maxsize=50) # For UI logs
         self.anomaly_trigger = None # 'token_runaway', 'loop_count', or None
+        self.session = requests.Session() # Reuse connection for metrics
         
         self.log("Initializing Sentinel Engine...")
         try:
@@ -133,7 +134,7 @@ class SentinelEngine:
         }
         
         try:
-            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            response = self.session.post(url, headers=headers, json=payload, timeout=2)
             if response.status_code != 202:
                 self.log(f"Failed to submit metric {metric_name}: {response.text}")
         except Exception as e:
@@ -177,7 +178,11 @@ class SentinelEngine:
                     self.event_queue.get()
                 self.event_queue.put(event)
                 
-                time.sleep(1) # 1 event per second for demo pacing
+                # Smart sleep: wait 1s but wake up early if anomaly triggered
+                for _ in range(10):
+                    if not self.producer_running: break
+                    if self.anomaly_trigger: break
+                    time.sleep(0.1)
             except Exception as e:
                 self.log(f"Producer error: {e}")
                 time.sleep(1)
@@ -197,7 +202,8 @@ class SentinelEngine:
                 event = msg.value()
                 
                 # Send to Datadog
-                self.send_to_datadog(event)
+                # REMOVED: We now rely on Datadog Monitors -> Incidents flow
+                # self.send_to_datadog(event)
                 
                 # Add to UI queue
                 if self.anomaly_queue.full():
@@ -252,21 +258,12 @@ class SentinelEngine:
                     "env:production"
                 ]
                 
-                # Submit Metrics (The "First-Class" Signal)
+                # Extract metrics
                 tokens = event.get('tokens_used') or event.get('tokens_generated', 0)
                 steps = event.get('step_index') or event.get('loop_step', 0)
                 latency = event.get('latency_ms', 0)
-                
-                self.submit_metric("sentinellm.token.count", tokens, tags)
-                self.submit_metric("sentinellm.llm.latency_ms", latency, tags)
-                self.submit_metric("sentinellm.agent.loop.count", steps, tags)
-                
-                # Calculate Velocity (Tokens / Latency in seconds)
-                if latency > 0:
-                    velocity = tokens / (latency / 1000.0)
-                    self.submit_metric("sentinellm.token.velocity", velocity, tags)
 
-                # Anomaly Detection Logic
+                # Anomaly Detection Logic (Check BEFORE submitting metrics to reduce latency)
                 is_anomaly = False
                 if tokens > 5000:
                     is_anomaly = True
@@ -276,9 +273,6 @@ class SentinelEngine:
                 
                 if is_anomaly:
                     self.log(f"Local Processor found anomaly: {event.get('trace_id', 'unknown')}")
-                    
-                    # Submit Error Metric
-                    self.submit_metric("sentinellm.request.error", 1, tags)
                     
                     anomaly_event = {
                         "trace_id": event.get("trace_id"),
@@ -293,6 +287,20 @@ class SentinelEngine:
                     
                     self.anomalies_producer.produce(topic=CONSUMER_TOPIC, key=agent_id, value=anomaly_event)
                     self.anomalies_producer.poll(0)
+                    
+                    # Submit Error Metric
+                    self.submit_metric("sentinellm.request.error", 1, tags)
+
+                # Submit Metrics (The "First-Class" Signal)
+                # Now using a session and lower timeout to avoid blocking the loop for too long
+                self.submit_metric("sentinellm.token.count", tokens, tags)
+                self.submit_metric("sentinellm.llm.latency_ms", latency, tags)
+                self.submit_metric("sentinellm.agent.loop.count", steps, tags)
+                
+                # Calculate Velocity (Tokens / Latency in seconds)
+                if latency > 0:
+                    velocity = tokens / (latency / 1000.0)
+                    self.submit_metric("sentinellm.token.velocity", velocity, tags)
 
             except Exception as e:
                 print(f"Processor error: {e}")

@@ -194,5 +194,5 @@ with col_anomalies:
         st.info("No anomalies detected yet.")
 
 # Auto-refresh
-time.sleep(1)
+time.sleep(0.5)
 st.rerun()

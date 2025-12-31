@@ -202,8 +202,8 @@ class SentinelEngine:
                 event = msg.value()
                 
                 # Send to Datadog
-                # REMOVED: We now rely on Datadog Monitors -> Incidents flow
-                # self.send_to_datadog(event)
+                # Re-enabled: Sending only anomalies as events to reduce latency/volume
+                self.send_to_datadog(event)
                 
                 # Add to UI queue
                 if self.anomaly_queue.full():
@@ -292,15 +292,15 @@ class SentinelEngine:
                     self.submit_metric("sentinellm.request.error", 1, tags)
 
                 # Submit Metrics (The "First-Class" Signal)
-                # Now using a session and lower timeout to avoid blocking the loop for too long
-                self.submit_metric("sentinellm.token.count", tokens, tags)
-                self.submit_metric("sentinellm.llm.latency_ms", latency, tags)
-                self.submit_metric("sentinellm.agent.loop.count", steps, tags)
+                # DISABLED: To reduce latency, we only send anomalies (via events) and error metrics
+                # self.submit_metric("sentinellm.token.count", tokens, tags)
+                # self.submit_metric("sentinellm.llm.latency_ms", latency, tags)
+                # self.submit_metric("sentinellm.agent.loop.count", steps, tags)
                 
                 # Calculate Velocity (Tokens / Latency in seconds)
-                if latency > 0:
-                    velocity = tokens / (latency / 1000.0)
-                    self.submit_metric("sentinellm.token.velocity", velocity, tags)
+                # if latency > 0:
+                #     velocity = tokens / (latency / 1000.0)
+                #     self.submit_metric("sentinellm.token.velocity", velocity, tags)
 
             except Exception as e:
                 print(f"Processor error: {e}")

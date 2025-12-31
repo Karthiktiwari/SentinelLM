@@ -1,0 +1,107 @@
+{
+  "title": "SentinelLM – LLM Production Health",
+  "description": "Production observability for LLM agents: latency, tokens, and behavioral anomalies.",
+  "layout_type": "ordered",
+  "reflow_type": "fixed",
+  "notify_list": [],
+  "template_variables": [],
+  "widgets": [
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "P95 LLM Latency by Model",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "latency",
+                "query": "p95:sentinellm.llm.latency_ms{*} by {model}"
+              }
+            ],
+            "display_type": "line"
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 0, "width": 12, "height": 4 }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Token Usage by Agent",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "tokens",
+                "query": "sum:sentinellm.token.count{*} by {agent_id}"
+              }
+            ],
+            "display_type": "bars"
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 4, "width": 12, "height": 4 }
+    },
+    {
+      "definition": {
+        "type": "timeseries",
+        "title": "Token Velocity (Runaway Detection)",
+        "requests": [
+          {
+            "response_format": "timeseries",
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "velocity",
+                "query": "avg:sentinellm.token.velocity{*} by {model}"
+              }
+            ],
+            "display_type": "line"
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 8, "width": 12, "height": 4 }
+    },
+    {
+      "definition": {
+        "type": "toplist",
+        "title": "Agent Loop Count by Agent",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "loops",
+                "query": "max:sentinellm.agent.loop.count{*} by {agent_id}"
+              }
+            ]
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 12, "width": 12, "height": 4 }
+    },
+    {
+      "definition": {
+        "type": "query_value",
+        "title": "Total LLM Errors",
+        "requests": [
+          {
+            "queries": [
+              {
+                "data_source": "metrics",
+                "name": "errors",
+                "query": "sum:sentinellm.request.error{*}.as_count()"
+              }
+            ],
+            "autoscale": true
+          }
+        ]
+      },
+      "layout": { "x": 0, "y": 16, "width": 12, "height": 3 }
+    }
+  ]
+}

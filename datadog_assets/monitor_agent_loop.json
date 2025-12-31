@@ -1,0 +1,16 @@
+{
+  "name": "[SentinelLM] Agent Loop Detection",
+  "type": "metric alert",
+  "query": "max(last_2m):max:sentinellm.agent.loop.count{*} > 50",
+  "message": "Agent is stuck in a loop.\n\nLoop Count: {{value}}\n\nSuggested action: check agent recursion or planner logic.",
+  "tags": ["service:sentinellm", "severity:high", "type:behavioral"],
+  "options": {
+    "thresholds": {
+      "critical": 50,
+      "warning": 30
+    },
+    "notify_no_data": false,
+    "include_tags": true,
+    "renotify_interval": 10
+  }
+}

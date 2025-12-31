@@ -110,17 +110,48 @@ class SentinelEngine:
         }
         return DeserializingConsumer(consumer_conf)
 
+    def submit_metric(self, metric_name, value, tags):
+        """Submits a custom metric to Datadog API."""
+        if not DD_API_KEY:
+            return
+
+        url = f"https://api.{DD_SITE}/api/v1/series"
+        headers = {
+            "Content-Type": "application/json",
+            "DD-API-KEY": DD_API_KEY
+        }
+        
+        payload = {
+            "series": [
+                {
+                    "metric": metric_name,
+                    "points": [[int(time.time()), value]],
+                    "type": "gauge",
+                    "tags": tags
+                }
+            ]
+        }
+        
+        try:
+            response = requests.post(url, headers=headers, json=payload, timeout=5)
+            if response.status_code != 202:
+                self.log(f"Failed to submit metric {metric_name}: {response.text}")
+        except Exception as e:
+            self.log(f"Error submitting metric: {e}")
+
     def generate_event(self):
         """Generates a simulated AI agent event matching the Flink schema."""
         event = {
             "trace_id": str(uuid.uuid4()),
             "node_name": f"agent-{random.randint(1, 5)}",
+            "agent_id": f"agent-{random.randint(1, 5)}",
             "request_id": str(uuid.uuid4()),
             "ts": int(time.time() * 1000),
             "tokens_used": random.randint(10, 1000),
             "step_index": random.randint(1, 20),
             "latency_ms": random.randint(100, 5000),
-            "model_name": random.choice(["gpt-4", "claude-3", "gemini-pro"])
+            "model_name": random.choice(["gpt-4", "claude-3", "gemini-pro"]),
+            "deployment_version": "v1.2.0"
         }
 
         if self.anomaly_trigger == 'token_runaway':
@@ -207,18 +238,47 @@ class SentinelEngine:
 
                 event = msg.value()
                 
-                is_anomaly = False
+                # Extract tags
+                agent_id = event.get('agent_id') or event.get('node_name', 'unknown')
+                node_name = event.get('node_name', 'unknown')
+                model_name = event.get('model_name', 'unknown')
+                version = event.get('deployment_version', 'v1.0.0')
+                
+                tags = [
+                    f"agent_id:{agent_id}",
+                    f"model:{model_name}",
+                    f"graph_node:{node_name}",
+                    f"deployment_version:{version}",
+                    "env:production"
+                ]
+                
+                # Submit Metrics (The "First-Class" Signal)
                 tokens = event.get('tokens_used') or event.get('tokens_generated', 0)
+                steps = event.get('step_index') or event.get('loop_step', 0)
+                latency = event.get('latency_ms', 0)
+                
+                self.submit_metric("sentinellm.token.count", tokens, tags)
+                self.submit_metric("sentinellm.llm.latency_ms", latency, tags)
+                self.submit_metric("sentinellm.agent.loop.count", steps, tags)
+                
+                # Calculate Velocity (Tokens / Latency in seconds)
+                if latency > 0:
+                    velocity = tokens / (latency / 1000.0)
+                    self.submit_metric("sentinellm.token.velocity", velocity, tags)
+
+                # Anomaly Detection Logic
+                is_anomaly = False
                 if tokens > 5000:
                     is_anomaly = True
                 
-                steps = event.get('step_index') or event.get('loop_step', 0)
                 if steps > 50:
                     is_anomaly = True
                 
                 if is_anomaly:
-                    agent_id = event.get('node_name') or event.get('agent_id', 'unknown')
                     self.log(f"Local Processor found anomaly: {event.get('trace_id', 'unknown')}")
+                    
+                    # Submit Error Metric
+                    self.submit_metric("sentinellm.request.error", 1, tags)
                     
                     anomaly_event = {
                         "trace_id": event.get("trace_id"),
@@ -253,8 +313,9 @@ class SentinelEngine:
         
         agent_id = event.get('node_name') or event.get('agent_id', 'unknown')
         model_name = event.get('model_name', 'unknown')
+        anomaly_type = event.get('anomaly_type', 'unknown')
         
-        title = "SentinelLM Anomaly Detected"
+        title = f"SentinelLM Alert: {anomaly_type} on {agent_id}"
         text = f"Anomaly detected for agent {agent_id}.\nDetails: {json.dumps(event, indent=2, default=str)}"
         
         payload = {
@@ -263,10 +324,10 @@ class SentinelEngine:
             "alert_type": "error",
             "source_type_name": "sentinellm",
             "tags": [
-                "env:hackathon",
+                "env:production",
                 "source:sentinellm",
-                f"agent:{agent_id}",
-                f"model:{model_name}"
+                f"agent_id:{agent_id}",
+                f"anomaly_type:{anomaly_type}"
             ]
         }
         

@@ -1,0 +1,14 @@
+{
+  "name": "[SentinelLM] Latency Regression",
+  "type": "metric alert",
+  "query": "avg(last_10m):p95:sentinellm.llm.latency_ms{*} > 2000",
+  "message": "P95 latency regression detected.\n\nLatency: {{value}} ms\n\nCheck recent deployments or model changes.",
+  "tags": ["service:sentinellm", "severity:medium", "type:performance"],
+  "options": {
+    "thresholds": {
+      "critical": 2000,
+      "warning": 1500
+    },
+    "include_tags": true
+  }
+}

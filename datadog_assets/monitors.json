@@ -1,0 +1,46 @@
+[
+  {
+    "name": "[SentinelLM] Agent Loop Detection",
+    "type": "metric alert",
+    "query": "max(last_2m):max:sentinellm.agent.loop.count{*} > 50",
+    "message": "Agent is stuck in a loop.\n\nLoop Count: {{value}}\n\nSuggested action: check agent recursion or planner logic.",
+    "tags": ["service:sentinellm", "severity:high", "type:behavioral"],
+    "options": {
+      "thresholds": {
+        "critical": 50,
+        "warning": 30
+      },
+      "notify_no_data": false,
+      "include_tags": true,
+      "renotify_interval": 10
+    }
+  },
+  {
+    "name": "[SentinelLM] Token Runaway Detected",
+    "type": "metric alert",
+    "query": "avg(last_5m):avg:sentinellm.token.velocity{*} > 1000",
+    "message": "Token velocity spike detected.\n\nVelocity: {{value}} tokens/sec\n\nLikely cause: recursive agent behavior or prompt expansion.",
+    "tags": ["service:sentinellm", "severity:critical", "type:cost"],
+    "options": {
+      "thresholds": {
+        "critical": 1000,
+        "warning": 800
+      },
+      "include_tags": true
+    }
+  },
+  {
+    "name": "[SentinelLM] Latency Regression",
+    "type": "metric alert",
+    "query": "avg(last_10m):p95:sentinellm.llm.latency_ms{*} > 2000",
+    "message": "P95 latency regression detected.\n\nLatency: {{value}} ms\n\nCheck recent deployments or model changes.",
+    "tags": ["service:sentinellm", "severity:medium", "type:performance"],
+    "options": {
+      "thresholds": {
+        "critical": 2000,
+        "warning": 1500
+      },
+      "include_tags": true
+    }
+  }
+]

@@ -1,0 +1,14 @@
+{
+  "name": "[SentinelLM] Token Runaway Detected",
+  "type": "metric alert",
+  "query": "avg(last_5m):avg:sentinellm.token.velocity{*} > 1000",
+  "message": "Token velocity spike detected.\n\nVelocity: {{value}} tokens/sec\n\nLikely cause: recursive agent behavior or prompt expansion.",
+  "tags": ["service:sentinellm", "severity:critical", "type:cost"],
+  "options": {
+    "thresholds": {
+      "critical": 1000,
+      "warning": 800
+    },
+    "include_tags": true
+  }
+}

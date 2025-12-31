@@ -49,22 +49,29 @@ def load_schema():
         return f.read()
 
 def generate_event():
+    agent_id = f"agent-{random.randint(1, 5)}"
+    node_name = f"node-{random.choice(['A', 'B', 'C', 'D'])}"
+    model_name = random.choice(["gemini-pro", "deepseek", "gemini-flash"])
+    
     return {
-        "event_id": str(uuid.uuid4()),
-        "agent_id": f"agent-{random.randint(1, 5)}",
-        "session_id": str(uuid.uuid4()),
-        "timestamp_ms": int(time.time() * 1000),
-        "tokens_generated": random.randint(10, 1000),
-        "loop_step": random.randint(1, 20),
-        "latency_ms": random.randint(100, 5000),
-        "model_name": random.choice(["gpt-4", "claude-3", "gemini-pro"])
+        "trace_id": str(uuid.uuid4()),
+        "request_id": str(uuid.uuid4()),
+        "model_name": model_name,
+        "agent_id": agent_id,
+        "node_name": node_name,
+        "deployment_version": "v1.2.0",
+        "step_index": random.randint(1, 10),
+        "tokens_used": random.randint(10, 1000),
+        "latency_ms": random.randint(100, 2000),
+        "ts": int(time.time() * 1000)
     }
 
 def delivery_report(err, msg):
     if err is not None:
         print(f"Delivery failed for User record {msg.key()}: {err}")
     else:
-        print(f"User record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+        # print(f"User record {msg.key()} successfully produced to {msg.topic()} [{msg.partition()}] at offset {msg.offset()}")
+        pass
 
 def main():
     if not BOOTSTRAP_SERVERS:
@@ -81,12 +88,22 @@ def main():
         while True:
             event = generate_event()
             # Trigger some anomalies occasionally
-            if random.random() < 0.1:
-                event['tokens_generated'] = random.randint(5000, 10000) # Token runaway
-            if random.random() < 0.1:
-                event['loop_step'] = random.randint(50, 100) # Loop count anomaly
+            if random.random() < 0.05:
+                event['tokens_used'] = random.randint(5000, 10000) # Token runaway
+                print(f"⚠️ Generated Token Runaway: {event['tokens_used']} tokens")
             
-            producer.produce(topic=TOPIC, key=event['agent_id'], value=event, on_delivery=delivery_report)
+            if random.random() < 0.05:
+                event['step_index'] = random.randint(50, 100) # Loop count anomaly
+                print(f"⚠️ Generated Loop Anomaly: {event['step_index']} steps")
+            
+            if random.random() < 0.05:
+                event['latency_ms'] = random.randint(5000, 10000) # Latency spike
+                print(f"⚠️ Generated Latency Spike: {event['latency_ms']} ms")
+            
+            # Ensure key is string
+            key = str(event['agent_id'])
+            
+            producer.produce(topic=TOPIC, key=key, value=event, on_delivery=delivery_report)
             producer.poll(0)
             time.sleep(1)
     except KeyboardInterrupt:

@@ -1,0 +1,15 @@
+{
+  "type": "record",
+  "name": "agent_events_value",
+  "namespace": "org.apache.flink.avro.generated.record",
+  "fields": [
+    {"name": "trace_id", "type": ["null", "string"], "default": null},
+    {"name": "request_id", "type": ["null", "string"], "default": null},
+    {"name": "model_name", "type": ["null", "string"], "default": null},
+    {"name": "node_name", "type": ["null", "string"], "default": null},
+    {"name": "step_index", "type": ["null", "int"], "default": null},
+    {"name": "tokens_used", "type": ["null", "int"], "default": null},
+    {"name": "latency_ms", "type": ["null", "int"], "default": null},
+    {"name": "ts", "type": ["null", {"type": "long", "logicalType": "local-timestamp-millis"}], "default": null}
+  ]
+}

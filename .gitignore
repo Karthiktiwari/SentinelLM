@@ -1,0 +1,7 @@
+.env
+deploy_gcp.sh
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.vscode/
+.azure/

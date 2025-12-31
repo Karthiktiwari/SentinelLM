@@ -1,0 +1,12 @@
+confluent-kafka[avro,json,schema-registry]
+requests
+python-dotenv
+faker
+ddtrace
+streamlit
+pandas
+plotly
+google-generativeai
+
+
+
